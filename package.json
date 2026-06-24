@@ -1,0 +1,38 @@
+{
+  "name": "kitakita",
+  "version": "0.1.0",
+  "private": true,
+  "description": "KitaKita - AI vision assistant for visually impaired users (Android via Capacitor)",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "cap:sync": "next build && cap sync",
+    "android:open": "next build && cap sync && cap open android",
+    "android:apk": "next build && cap sync && cd android && gradlew.bat assembleDebug"
+  },
+  "dependencies": {
+    "@capacitor-community/speech-recognition": "^6.0.1",
+    "@capacitor-community/text-to-speech": "^5.1.0",
+    "@capacitor/android": "^6.2.0",
+    "@capacitor/camera": "^6.1.2",
+    "@capacitor/core": "^6.2.0",
+    "@capacitor/geolocation": "^6.1.0",
+    "@capacitor/haptics": "^6.0.2",
+    "@capacitor/motion": "^6.0.2",
+    "@google/genai": "^2.9.0",
+    "@tensorflow-models/coco-ssd": "^2.2.3",
+    "@tensorflow/tfjs": "^4.22.0",
+    "next": "14.2.35",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.2.0",
+    "@types/node": "^20.14.10",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "typescript": "^5.5.3"
+  }
+}

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">KitaKita</string>
+    <string name="title_activity_main">KitaKita</string>
+    <string name="package_name">com.kitakita.app</string>
+    <string name="custom_url_scheme">com.kitakita.app</string>
+</resources>

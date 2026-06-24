@@ -1,0 +1,26 @@
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# capacitor / android build artifacts
+/android/.gradle/
+/android/build/
+/android/app/build/
+/android/capacitor-cordova-android-plugins/
+/android/local.properties
+/android/app/src/main/assets/public/
+
+# misc
+.DS_Store
+*.pem
+.env*.local
+*.tsbuildinfo
+next-env.d.ts
