@@ -7,6 +7,11 @@ const config: CapacitorConfig = {
   android: {
     allowMixedContent: true,
   },
+  // Development server - for live reload
+  // server: {
+  //   url: "http://192.168.254.117:3000",
+  //   cleartext: true,
+  // },
 };
 
 export default config;

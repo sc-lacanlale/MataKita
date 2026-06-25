@@ -54,9 +54,9 @@ export default function BottomNav() {
             aria-current={isActive ? "page" : undefined}
           >
             <span className="nav-icon">
-              <Icon name={tab.icon} size={26} />
+              <Icon name={tab.icon} size={38} />
+              <span className="nav-label">{tab.label}</span>
             </span>
-            <span className="nav-label">{tab.label}</span>
           </Link>
         );
       })}

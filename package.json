@@ -10,7 +10,10 @@
     "lint": "next lint",
     "cap:sync": "next build && cap sync",
     "android:open": "next build && cap sync && cap open android",
-    "android:apk": "next build && cap sync && cd android && gradlew.bat assembleDebug"
+    "android:apk": "next build && cap sync && cd android && gradlew.bat assembleDebug",
+    "android:build": "next build && cap sync && cd android && ./gradlew assembleDebug",
+    "android:install": "adb install -r android/app/build/outputs/apk/debug/app-debug.apk",
+    "android:run": "npm run android:build && npm run android:install && adb shell am start -n com.kitakita.app/.MainActivity"
   },
   "dependencies": {
     "@capacitor-community/speech-recognition": "^6.0.1",
