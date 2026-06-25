@@ -1,7 +1,9 @@
 "use client";
 
-import Link from "next/link";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import BrandLogo from "@/components/BrandLogo";
+import BottomNav from "@/components/BottomNav";
+import Icon from "@/components/Icons";
 import {
   startHandoff,
   type HandoffSession,
@@ -10,82 +12,123 @@ import {
 import { triggerPanic } from "@/lib/services/hazardService";
 import { speak } from "@/lib/voice";
 
-export default function EmergencyPage() {
-  const [steps, setSteps] = useState<string[]>([]);
+export default function VideoCallScreen() {
   const [connected, setConnected] = useState(false);
   const [active, setActive] = useState(false);
+  const [muted, setMuted] = useState(false);
+  const [fall, setFall] = useState(false);
   const sessionRef = useRef<HandoffSession | null>(null);
+  const autoStartedRef = useRef(false);
+
+  // Fall-detection routes here with ?fall=1 (only after the countdown finishes
+  // or the user taps "Get help now"), so we auto-start the emergency call.
+  // The normal Video Call tab does NOT auto-start; the user taps to call.
+  useEffect(() => {
+    const isFall = new URLSearchParams(window.location.search).get("fall") === "1";
+    setFall(isFall);
+    if (isFall && !autoStartedRef.current) {
+      autoStartedRef.current = true;
+      begin("emergency-services");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function begin(target: HandoffTarget) {
     sessionRef.current?.cancel();
-    setSteps([]);
     setConnected(false);
     setActive(true);
-    triggerPanic("button");
-    speak("Emergency fallback activated. Connecting you now.");
+    if (target === "volunteer") {
+      speak("Kumokonekta sa isang volunteer.");
+    } else {
+      triggerPanic("button");
+      speak("Tumatawag ng tulong.");
+    }
     sessionRef.current = startHandoff({
       target,
-      contextSummary: "User triggered emergency fallback from the app.",
-      onStep: (step) => setSteps((prev) => [...prev, step.label]),
+      contextSummary:
+        target === "volunteer"
+          ? "User started a video call from the app."
+          : "Fall detected: contacting emergency help.",
+      onStep: () => {},
       onConnected: () => setConnected(true),
     });
   }
 
-  function cancel() {
+  function end() {
     sessionRef.current?.cancel();
     sessionRef.current = null;
     setActive(false);
     setConnected(false);
-    setSteps([]);
+    setMuted(false);
   }
 
   return (
-    <main className="screen">
-      <header className="screen-header">
-        <Link href="/" className="btn btn-small btn-ghost" style={{ width: "auto" }} aria-label="Back to home">
-          Back
-        </Link>
-        <div>
-          <h1 className="screen-title">Emergency</h1>
-          <p className="screen-subtitle">Drop the AI layer and reach a human.</p>
+    <main className="call-screen">
+      <div className="app-bar">
+        <BrandLogo tone="dark" />
+        <div className="status-dots" aria-hidden="true">
+          <span />
+          <span />
         </div>
-      </header>
+      </div>
 
-      {!active ? (
-        <div className="grid">
-          <button className="btn btn-danger" onClick={() => begin("volunteer")}>
-            Call a volunteer
+      <div className="call-stage">
+        {active ? (
+          <>
+            <div className="cam-placeholder">
+              {connected ? "Naka-connect" : "Kumokonekta..."}
+            </div>
+            <div className="call-self" aria-hidden="true" />
+            <p className="call-status" role="status" aria-live="polite">
+              {fall
+                ? connected
+                  ? "Naka-connect sa emergency services. Live ang video at lokasyon."
+                  : "Tumatawag sa emergency services..."
+                : connected
+                  ? "Live na ang video at lokasyon sa kausap mo."
+                  : "Inaayos ang live stream at lokasyon..."}
+            </p>
+          </>
+        ) : (
+          <div className="call-precard">
+            <div className="call-avatar" aria-hidden="true">
+              <Icon name="video" size={42} />
+            </div>
+            <h2>Video Call</h2>
+            <p>Kumonekta sa isang volunteer para sa tulong.</p>
+            <button className="btn btn-accent" onClick={() => begin("volunteer")}>
+              Tumawag sa volunteer
+            </button>
+          </div>
+        )}
+      </div>
+
+      {active && (
+        <div className="call-controls">
+          <button type="button" className="call-round" aria-label="Camera" onClick={() => {}}>
+            <Icon name="camera" size={30} />
           </button>
-          <button className="btn" onClick={() => begin("emergency-contact")}>
-            Call emergency contact
+          <button
+            type="button"
+            className="call-round is-end"
+            aria-label="Tapusin ang tawag"
+            onClick={end}
+          >
+            <Icon name="phone" size={30} style={{ transform: "rotate(135deg)" }} />
           </button>
-          <button className="btn" onClick={() => begin("emergency-services")}>
-            Call emergency services
+          <button
+            type="button"
+            className="call-round"
+            aria-pressed={muted}
+            aria-label={muted ? "I-unmute" : "I-mute"}
+            onClick={() => setMuted((m) => !m)}
+          >
+            <Icon name={muted ? "micOff" : "mic"} size={30} />
           </button>
         </div>
-      ) : (
-        <section className="card">
-          <h2 style={{ marginTop: 0 }}>
-            {connected ? "Connected" : "Connecting..."}
-          </h2>
-          <ul className="steps">
-            {steps.map((s, i) => (
-              <li key={i}>
-                <span className="check" aria-hidden="true">OK</span>
-                <span>{s}</span>
-              </li>
-            ))}
-          </ul>
-          <div className="status-line" role="status" aria-live="assertive" style={{ marginTop: 14 }}>
-            {connected
-              ? "Live stream and GPS shared with your responder."
-              : "Setting up live stream and location..."}
-          </div>
-          <button className="btn btn-ghost" style={{ marginTop: 14 }} onClick={cancel}>
-            Cancel
-          </button>
-        </section>
       )}
+
+      <BottomNav />
     </main>
   );
 }

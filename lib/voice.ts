@@ -24,6 +24,35 @@ export function detectLang(text: string): string {
   return FILIPINO_HINT.test(text) ? "fil-PH" : "en-US";
 }
 
+/**
+ * Self-hearing guard. While the app is speaking (and for a short grace period
+ * afterwards) we mark `speaking = true` so the speech recognizer can ignore its
+ * own TTS output instead of looping on it.
+ */
+let speaking = false;
+let speakingTimer: ReturnType<typeof setTimeout> | null = null;
+
+export function isSpeaking(): boolean {
+  return speaking;
+}
+
+function beginSpeaking() {
+  speaking = true;
+  if (speakingTimer) {
+    clearTimeout(speakingTimer);
+    speakingTimer = null;
+  }
+}
+
+function endSpeakingSoon() {
+  if (speakingTimer) clearTimeout(speakingTimer);
+  // Grace period for trailing audio / mic latency before listening again.
+  speakingTimer = setTimeout(() => {
+    speaking = false;
+    speakingTimer = null;
+  }, 800);
+}
+
 export async function speak(text: string, lang?: string): Promise<void> {
   if (typeof window === "undefined" || !text) return;
   const language = lang || detectLang(text);
@@ -32,14 +61,17 @@ export async function speak(text: string, lang?: string): Promise<void> {
     try {
       const { TextToSpeech } = await import("@capacitor-community/text-to-speech");
       await TextToSpeech.stop().catch(() => {});
+      beginSpeaking();
       try {
         await TextToSpeech.speak({ text, lang: language, rate: 1.0 });
       } catch {
         // Device may lack the Filipino voice; fall back to English voice.
         await TextToSpeech.speak({ text, lang: "en-US", rate: 1.0 });
       }
+      endSpeakingSoon();
       return;
     } catch (err) {
+      endSpeakingSoon();
       console.warn("[voice] native TTS failed, falling back:", err);
     }
   }
@@ -53,8 +85,12 @@ export async function speak(text: string, lang?: string): Promise<void> {
     synth.cancel();
     const utter = new SpeechSynthesisUtterance(text);
     utter.lang = language;
+    beginSpeaking();
+    utter.onend = endSpeakingSoon;
+    utter.onerror = endSpeakingSoon;
     synth.speak(utter);
   } catch (err) {
+    endSpeakingSoon();
     console.warn("[voice] speak failed:", err);
   }
 }

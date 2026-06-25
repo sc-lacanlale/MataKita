@@ -1,42 +1,42 @@
 import Link from "next/link";
 import { MODE_LIST } from "@/lib/modes";
+import BrandLogo from "@/components/BrandLogo";
+import BottomNav from "@/components/BottomNav";
+import Icon from "@/components/Icons";
 
 export default function HomePage() {
   return (
-    <main className="screen">
-      <header className="screen-header">
-        <div>
-          <h1 className="screen-title">KitaKita</h1>
-          <p className="screen-subtitle">Your AI eyes for the world around you.</p>
+    <main className="home-screen">
+      <header className="app-bar">
+        <BrandLogo tone="dark" />
+        <div className="status-dots" aria-hidden="true">
+          <span />
+          <span />
         </div>
       </header>
 
-      <nav className="grid" aria-label="Assistant modes">
-        {MODE_LIST.map((mode) => (
-          <Link
-            key={mode.id}
-            href={`/${mode.id}`}
-            className="btn btn-accent"
-            aria-label={`${mode.label}: ${mode.description}`}
-          >
-            {mode.label}
-          </Link>
-        ))}
+      <section className="home-panel">
+        <h1 className="home-title">Ready to explore?</h1>
 
-        <Link href="/teach" className="btn" aria-label="Teach My World: register your belongings and spaces">
-          Teach My World
-        </Link>
-      </nav>
+        <nav className="mode-grid" aria-label="Assistant modes">
+          {MODE_LIST.map((mode) => (
+            <Link
+              key={mode.id}
+              href={`/${mode.id}`}
+              className="mode-card"
+              style={{ background: mode.color }}
+              aria-label={`${mode.label} mode: ${mode.description}`}
+            >
+              <span className="mode-card-title">{mode.label}</span>
+              <span className="mode-card-icon">
+                <Icon name={mode.icon} size={56} />
+              </span>
+            </Link>
+          ))}
+        </nav>
+      </section>
 
-      <div className="spacer" />
-
-      <Link
-        href="/emergency"
-        className="btn btn-danger"
-        aria-label="Emergency fallback: connect to a human volunteer or emergency services"
-      >
-        Emergency
-      </Link>
+      <BottomNav />
     </main>
   );
 }

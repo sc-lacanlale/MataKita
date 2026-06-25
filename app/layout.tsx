@@ -3,6 +3,7 @@ import "./globals.css";
 import HazardWatcher from "@/components/HazardWatcher";
 import VoiceCommander from "@/components/VoiceCommander";
 import DebugPanel from "@/components/DebugPanel";
+import SplashScreen from "@/components/SplashScreen";
 
 export const metadata: Metadata = {
   title: "KitaKita",
@@ -15,7 +16,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  themeColor: "#0b0b0f",
+  themeColor: "#42b7ff",
 };
 
 export default function RootLayout({
@@ -25,8 +26,17 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Tilt+Warp&display=swap"
+          rel="stylesheet"
+        />
+      </head>
       <body>
         <div id="app-root">{children}</div>
+        <SplashScreen />
         <HazardWatcher />
         <VoiceCommander />
         <DebugPanel />

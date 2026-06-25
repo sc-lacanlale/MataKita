@@ -44,7 +44,7 @@ export default function HazardWatcher() {
 
   function goToHelp() {
     dismiss();
-    router.push("/emergency");
+    router.push("/emergency?fall=1");
   }
 
   useEffect(() => {
@@ -77,7 +77,7 @@ export default function HazardWatcher() {
       setSeconds((s) => {
         if (s <= 1) {
           clearCountdown();
-          router.push("/emergency");
+          router.push("/emergency?fall=1");
           setAlerting(false);
           return COUNTDOWN_SECONDS;
         }

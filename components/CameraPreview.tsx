@@ -11,6 +11,12 @@ interface CameraPreviewProps {
   onStream?: (stream: MediaStream | null) => void;
   /** Automatically turn the camera on when mounted (no button needed). */
   autoStart?: boolean;
+  /** "card" = framed preview with start/stop buttons; "fill" = full-bleed background. */
+  variant?: "card" | "fill";
+  /** Bump this value to force a camera restart. */
+  restartKey?: number;
+  /** Which camera to use; changing it restarts the stream (flip camera). */
+  facingMode?: "environment" | "user";
 }
 
 type CamStatus = "idle" | "requesting" | "live" | "denied" | "unsupported";
@@ -19,11 +25,13 @@ export default function CameraPreview({
   showDetection = false,
   onStream,
   autoStart = false,
+  variant = "card",
+  restartKey = 0,
+  facingMode = "environment",
 }: CameraPreviewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [status, setStatus] = useState<CamStatus>("idle");
-  const startedRef = useRef(false);
 
   async function start() {
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
@@ -38,7 +46,7 @@ export default function CameraPreview({
     }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" },
+        video: { facingMode },
         audio: false,
       });
       streamRef.current = stream;
@@ -62,18 +70,39 @@ export default function CameraPreview({
     onStream?.(null);
   }
 
+  // Auto-start on mount and whenever restartKey / facingMode changes.
   useEffect(() => {
-    if (autoStart && !startedRef.current) {
-      startedRef.current = true;
-      void start();
-    }
+    if (!autoStart) return;
+    stop();
+    void start();
     return () => {
       streamRef.current?.getTracks().forEach((t) => t.stop());
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoStart]);
+  }, [autoStart, restartKey, facingMode]);
 
   const isLive = status === "live";
+
+  const placeholder = (
+    <>
+      {status === "idle" && "Camera is off."}
+      {status === "requesting" && "Binubuksan ang camera..."}
+      {status === "denied" && "Walang access sa camera. I-check ang permissions."}
+      {status === "unsupported" && "Hindi suportado ang camera sa device na ito."}
+    </>
+  );
+
+  if (variant === "fill") {
+    return (
+      <div className="cam-fill">
+        <video ref={videoRef} playsInline muted />
+        {showDetection && isLive && (
+          <DetectionOverlay videoRef={videoRef} active={isLive} />
+        )}
+        {!isLive && <div className="cam-placeholder">{placeholder}</div>}
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -82,14 +111,7 @@ export default function CameraPreview({
         {showDetection && isLive && (
           <DetectionOverlay videoRef={videoRef} active={isLive} />
         )}
-        {!isLive && (
-          <div className="preview-placeholder">
-            {status === "idle" && "Camera is off. Tap Start camera."}
-            {status === "requesting" && "Requesting camera access..."}
-            {status === "denied" && "Camera permission denied. Check app permissions."}
-            {status === "unsupported" && "Camera not supported on this device."}
-          </div>
-        )}
+        {!isLive && <div className="preview-placeholder">{placeholder}</div>}
       </div>
       <div className="row" style={{ marginTop: 12 }}>
         {!isLive ? (

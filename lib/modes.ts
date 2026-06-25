@@ -1,4 +1,6 @@
-export type ModeId = "cooking" | "outdoor" | "study";
+import type { IconName } from "@/components/Icons";
+
+export type ModeId = "outdoor" | "indoor" | "social" | "study" | "cooking";
 
 export interface ModeDefinition {
   id: ModeId;
@@ -11,24 +13,16 @@ export interface ModeDefinition {
   priorities: string[];
   /** Target capture frame rate; outdoor is high-fps for safety, study is trigger/low-fps. */
   targetFps: number;
+  /** Card / pill background colour (from the KitaKita design). */
+  color: string;
+  /** Glyph shown on the home card and the in-view mode pill. */
+  icon: IconName;
 }
 
 export const MODES: Record<ModeId, ModeDefinition> = {
-  cooking: {
-    id: "cooking",
-    label: "Cooking Mode",
-    description: "Close-range help around the kitchen.",
-    focus: "1-meter radius spatial reasoning",
-    priorities: [
-      "Sharp edge tracking (knives)",
-      "Heat / hazard indicators (boiling water, steam)",
-      "Ingredient identification",
-    ],
-    targetFps: 8,
-  },
   outdoor: {
     id: "outdoor",
-    label: "Outdoor Mode",
+    label: "Outdoor",
     description: "Low-latency awareness while moving.",
     focus: "Low-latency, high-contrast moving object detection",
     priorities: [
@@ -37,10 +31,40 @@ export const MODES: Record<ModeId, ModeDefinition> = {
       "Reading signage (bus stops, street names)",
     ],
     targetFps: 20,
+    color: "#ffe374",
+    icon: "sun",
+  },
+  indoor: {
+    id: "indoor",
+    label: "Indoor",
+    description: "Navigate rooms and find things at home.",
+    focus: "Indoor layout, doorways, furniture and obstacles",
+    priorities: [
+      "Doorways and walkways",
+      "Furniture and obstacles",
+      "Finding everyday objects",
+    ],
+    targetFps: 12,
+    color: "#ffb27a",
+    icon: "house",
+  },
+  social: {
+    id: "social",
+    label: "Social",
+    description: "Read people and social cues around you.",
+    focus: "People, expressions and social context",
+    priorities: [
+      "Who is nearby",
+      "Facial expressions and gestures",
+      "Where people are facing",
+    ],
+    targetFps: 8,
+    color: "#c9e57c",
+    icon: "users",
   },
   study: {
     id: "study",
-    label: "Study & Reading Mode",
+    label: "Study",
     description: "Read and summarize text.",
     focus: "High-resolution OCR and knowledge extraction",
     priorities: [
@@ -49,10 +73,32 @@ export const MODES: Record<ModeId, ModeDefinition> = {
       "Saving concepts to RAG for later querying",
     ],
     targetFps: 1,
+    color: "#87e1dd",
+    icon: "book",
+  },
+  cooking: {
+    id: "cooking",
+    label: "Cooking",
+    description: "Close-range help around the kitchen.",
+    focus: "1-meter radius spatial reasoning",
+    priorities: [
+      "Sharp edge tracking (knives)",
+      "Heat / hazard indicators (boiling water, steam)",
+      "Ingredient identification",
+    ],
+    targetFps: 8,
+    color: "#b7bdff",
+    icon: "cutlery",
   },
 };
 
-export const MODE_LIST: ModeDefinition[] = Object.values(MODES);
+export const MODE_LIST: ModeDefinition[] = [
+  MODES.outdoor,
+  MODES.indoor,
+  MODES.social,
+  MODES.study,
+  MODES.cooking,
+];
 
 export function getMode(id: ModeId): ModeDefinition {
   return MODES[id];

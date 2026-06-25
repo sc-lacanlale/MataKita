@@ -2,18 +2,20 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { speak, startListening, type Listener } from "@/lib/voice";
-import { requestDescribe } from "@/lib/commandBus";
+import { speak, startListening, isSpeaking, type Listener } from "@/lib/voice";
+import { requestDescribe, onVoiceToggle, setVoiceListening } from "@/lib/commandBus";
 import { logDebug } from "@/lib/debugLog";
 
 type NavCommand = { match: (p: string) => boolean; path: string; say: string };
 
 const NAV_COMMANDS: NavCommand[] = [
   { match: (p) => /\b(outdoor|outside|labas|kalsada|street)\b/.test(p), path: "/outdoor", say: "Outdoor mode" },
+  { match: (p) => /\b(indoor|inside|loob|kwarto|bahay loob)\b/.test(p), path: "/indoor", say: "Indoor mode" },
+  { match: (p) => /\b(social|people|tao|kausap|kaharap)\b/.test(p), path: "/social", say: "Social mode" },
   { match: (p) => /\b(cooking|kitchen|cook|luto|kusina)\b/.test(p), path: "/cooking", say: "Cooking mode" },
   { match: (p) => /\b(study|reading|read|basa|aral)\b/.test(p), path: "/study", say: "Study mode" },
   { match: (p) => /\b(teach|my world|register|ituro)\b/.test(p), path: "/teach", say: "Teach my world" },
-  { match: (p) => /\b(emergency|help me|panic|tulong|saklolo)\b/.test(p), path: "/emergency", say: "Emergency" },
+  { match: (p) => /\b(video call|call|volunteer|emergency|help me|panic|tulong|saklolo)\b/.test(p), path: "/emergency", say: "Video call" },
   { match: (p) => /\b(home|main menu|menu|umuwi|bahay)\b/.test(p), path: "/", say: "Home" },
 ];
 
@@ -69,35 +71,41 @@ export default function VoiceCommander() {
   }
 
   function handlePhrase(phrase: string) {
+    // Ignore anything heard while the app itself is talking (prevents the
+    // recognizer from looping on its own TTS, e.g. the fall announcement).
+    if (isSpeaking()) return;
+
     setHeard(phrase);
     logDebug("heard", phrase);
+
+    // Everything requires the "Hey Kita" trigger word - navigation included.
     const trig = parseTrigger(phrase);
+    if (!trig.hit) return;
+    const query = trig.query;
 
-    if (trig.hit) {
-      // Open question / shortcut. Debounce so we capture the full sentence
-      // instead of an early partial result.
-      if (queryDebounceRef.current) clearTimeout(queryDebounceRef.current);
-      const query = trig.query;
-      queryDebounceRef.current = setTimeout(() => fireDescribe(query), 1100);
-      return;
-    }
-
-    // No trigger word: only navigation commands act (never a Gemini call).
+    // Navigation command after the trigger ("Hey Kita, outdoor").
     const now = Date.now();
-    if (now - navCooldownRef.current < 3000) return;
     for (const cmd of NAV_COMMANDS) {
-      if (cmd.match(phrase)) {
+      if (cmd.match(query)) {
+        if (now - navCooldownRef.current < 3000) return;
         navCooldownRef.current = now;
+        if (queryDebounceRef.current) clearTimeout(queryDebounceRef.current);
         navigate(cmd);
         return;
       }
     }
+
+    // Otherwise it's an open question / describe shortcut. Debounce so we
+    // capture the full sentence instead of an early partial result.
+    if (queryDebounceRef.current) clearTimeout(queryDebounceRef.current);
+    queryDebounceRef.current = setTimeout(() => fireDescribe(query), 1100);
   }
 
   async function start() {
     if (listenerRef.current) return;
     listenerRef.current = await startListening(handlePhrase);
     setListening(true);
+    setVoiceListening(true);
   }
 
   function stop() {
@@ -105,11 +113,19 @@ export default function VoiceCommander() {
     listenerRef.current = null;
     if (queryDebounceRef.current) clearTimeout(queryDebounceRef.current);
     setListening(false);
+    setVoiceListening(false);
   }
 
   useEffect(() => {
     void start();
-    return () => stop();
+    const offToggle = onVoiceToggle(() => {
+      if (listenerRef.current) stop();
+      else void start();
+    });
+    return () => {
+      offToggle();
+      stop();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

@@ -19,3 +19,40 @@ export function requestDescribe(payload?: string): boolean {
   describeHandlers.forEach((h) => h(payload));
   return true;
 }
+
+/* ---------- Global voice listening toggle + state ---------- */
+
+type VoidHandler = () => void;
+type BoolHandler = (listening: boolean) => void;
+
+const voiceToggleHandlers = new Set<VoidHandler>();
+const voiceStateHandlers = new Set<BoolHandler>();
+let voiceListening = false;
+
+/** Registered by VoiceCommander; toggles the mic on/off. */
+export function onVoiceToggle(handler: VoidHandler): () => void {
+  voiceToggleHandlers.add(handler);
+  return () => voiceToggleHandlers.delete(handler);
+}
+
+/** Called by UI (e.g. the View mic button) to flip the global mic. */
+export function requestVoiceToggle(): void {
+  voiceToggleHandlers.forEach((h) => h());
+}
+
+/** Subscribe to mic listening-state changes. Fires immediately with current value. */
+export function onVoiceListening(handler: BoolHandler): () => void {
+  voiceStateHandlers.add(handler);
+  handler(voiceListening);
+  return () => voiceStateHandlers.delete(handler);
+}
+
+/** Published by VoiceCommander whenever listening starts/stops. */
+export function setVoiceListening(listening: boolean): void {
+  voiceListening = listening;
+  voiceStateHandlers.forEach((h) => h(listening));
+}
+
+export function getVoiceListening(): boolean {
+  return voiceListening;
+}

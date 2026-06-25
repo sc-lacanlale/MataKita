@@ -1,21 +1,32 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import CameraPreview from "./CameraPreview";
+import BrandLogo from "./BrandLogo";
+import BottomNav from "./BottomNav";
+import Icon from "./Icons";
 import type { ModeDefinition } from "@/lib/modes";
-import { startSession, type GeminiSession, type SessionStatus } from "@/lib/services/geminiService";
+import { startSession, type GeminiSession } from "@/lib/services/geminiService";
 import { speak } from "@/lib/voice";
-import { onDescribeRequested } from "@/lib/commandBus";
+import {
+  onDescribeRequested,
+  onVoiceListening,
+  requestVoiceToggle,
+} from "@/lib/commandBus";
+import { setLastMode } from "@/lib/lastMode";
 
 interface ModeShellProps {
   mode: ModeDefinition;
 }
 
+type Facing = "environment" | "user";
+
 export default function ModeShell({ mode }: ModeShellProps) {
-  const [status, setStatus] = useState<SessionStatus>("idle");
-  const [message, setMessage] = useState<string>(mode.description);
-  const [showDetection, setShowDetection] = useState(true);
+  const [message, setMessage] = useState<string>("Sandali, naghahanda...");
+  const [busy, setBusy] = useState(false);
+  const [micOn, setMicOn] = useState(false);
+  const [torchOn, setTorchOn] = useState(false);
+  const [facing, setFacing] = useState<Facing>("environment");
   const sessionRef = useRef<GeminiSession | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
@@ -25,28 +36,17 @@ export default function ModeShell({ mode }: ModeShellProps) {
       mode,
       getStream: () => streamRef.current,
       onStatus: (s) => {
-        setStatus(s);
         if (s === "live") {
-          setMessage((m) =>
-            m === mode.description || m === "Assistant stopped."
-              ? 'Handa na. Sabihin: "Hey Kita, tingin" o magtanong.'
-              : m
-          );
+          setMessage((m) => (m === "Sandali, naghahanda..." ? "" : m));
         }
-        if (s === "error") setMessage("Assistant error. Check network or API key.");
+        if (s === "error") setMessage("May problema sa assistant. I-check ang network o API key.");
       },
       onMessage: (text) => {
+        setBusy(false);
         setMessage(text);
         speak(text);
       },
     });
-  }
-
-  function stopAssistant() {
-    sessionRef.current?.stop();
-    sessionRef.current = null;
-    setStatus("idle");
-    setMessage("Assistant stopped.");
   }
 
   function describe(query?: string) {
@@ -55,86 +55,114 @@ export default function ModeShell({ mode }: ModeShellProps) {
       setMessage("Sandali, naghahanda pa...");
       return;
     }
+    setBusy(true);
     setMessage(query ? `Tinitingnan: ${query}` : "Sandali, tinitingnan...");
     sessionRef.current.describe(query);
   }
 
+  async function toggleTorch() {
+    const track = streamRef.current?.getVideoTracks?.()[0];
+    if (!track) return;
+    const next = !torchOn;
+    try {
+      await track.applyConstraints({
+        advanced: [{ torch: next }],
+      } as unknown as MediaTrackConstraints);
+      setTorchOn(next);
+    } catch {
+      setMessage("Walang flashlight ang camera na ito.");
+    }
+  }
+
+  function flipCamera() {
+    setTorchOn(false);
+    setFacing((f) => (f === "environment" ? "user" : "environment"));
+  }
+
   // Auto-connect the assistant on entry so describe-on-command is instant.
   useEffect(() => {
+    setLastMode(mode.id);
     startAssistant();
-    const off = onDescribeRequested((payload) => describe(payload));
+    const offDescribe = onDescribeRequested((payload) => describe(payload));
+    const offMic = onVoiceListening(setMicOn);
     return () => {
-      off();
+      offDescribe();
+      offMic();
       sessionRef.current?.stop();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const isLive = status === "live" || status === "connecting";
+  }, [mode.id]);
 
   return (
-    <main className="screen">
-      <header className="screen-header">
-        <Link href="/" className="btn btn-small btn-ghost" style={{ width: "auto" }} aria-label="Back to home">
-          Back
-        </Link>
-        <div>
-          <h1 className="screen-title">{mode.label}</h1>
-          <p className="screen-subtitle">{mode.focus}</p>
-        </div>
-      </header>
-
+    <main className="view-screen">
       <CameraPreview
+        variant="fill"
         autoStart
-        showDetection={showDetection}
+        facingMode={facing}
+        showDetection
         onStream={(s) => {
           streamRef.current = s;
         }}
       />
 
-      <div className="toggle-row">
-        <span>Show object boxes (visual only)</span>
-        <button
-          className={`btn btn-small ${showDetection ? "btn-accent" : "btn-ghost"}`}
-          style={{ width: "auto" }}
-          aria-pressed={showDetection}
-          onClick={() => setShowDetection((v) => !v)}
-        >
-          {showDetection ? "On" : "Off"}
-        </button>
-      </div>
-
-      <div className="card">
-        <p className="muted" style={{ marginTop: 0 }}>Priorities</p>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-          {mode.priorities.map((p) => (
-            <span className="pill" key={p}>{p}</span>
-          ))}
-          <span className="pill">~{mode.targetFps} fps</span>
+      <div className="view-topbar">
+        <BrandLogo tone="blue" />
+        <div className="status-dots on-dark" aria-hidden="true">
+          <span />
+          <span />
         </div>
       </div>
 
-      <div className="status-line" role="status" aria-live="polite">
-        {message}
+      <div className="mode-pill" style={{ background: mode.color }}>
+        <span className="mode-pill-label">{mode.label}</span>
+        <Icon name={mode.icon} size={34} />
       </div>
 
-      <div className="spacer" />
-
-      <button className="btn btn-accent" onClick={() => describe()} aria-label="Describe what is in front of me">
-        Ano ang nasa harap ko?
+      <button
+        type="button"
+        className={`circle-btn flash-btn ${torchOn ? "is-on" : ""}`}
+        onClick={toggleTorch}
+        aria-pressed={torchOn}
+        aria-label={torchOn ? "I-off ang flashlight" : "I-on ang flashlight"}
+      >
+        <Icon name="flash" size={30} />
       </button>
 
-      <div className="row">
-        {!isLive ? (
-          <button className="btn btn-small btn-ghost" onClick={startAssistant}>
-            Reconnect
-          </button>
-        ) : (
-          <button className="btn btn-small btn-ghost" onClick={stopAssistant}>
-            Stop assistant
-          </button>
-        )}
+      {message && (
+        <div className="view-caption" role="status" aria-live="polite">
+          {message}
+        </div>
+      )}
+
+      <div className="view-controls">
+        <button
+          type="button"
+          className="circle-btn control-btn"
+          onClick={() => requestVoiceToggle()}
+          aria-pressed={micOn}
+          aria-label={micOn ? "I-off ang voice" : "I-on ang voice"}
+        >
+          <Icon name={micOn ? "mic" : "micOff"} size={32} />
+        </button>
+
+        <button
+          type="button"
+          className={`shutter-btn ${busy ? "is-busy" : ""}`}
+          onClick={() => describe()}
+          aria-label="Ano ang nasa harap ko?"
+        />
+
+        <button
+          type="button"
+          className="circle-btn control-btn"
+          onClick={flipCamera}
+          aria-label="I-flip ang camera"
+        >
+          <Icon name="flipCamera" size={32} />
+        </button>
       </div>
+
+      <BottomNav />
     </main>
   );
 }
