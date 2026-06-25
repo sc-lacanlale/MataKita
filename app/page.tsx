@@ -3,10 +3,12 @@ import { MODE_LIST } from "@/lib/modes";
 import BrandLogo from "@/components/BrandLogo";
 import BottomNav from "@/components/BottomNav";
 import Icon from "@/components/Icons";
+import HomeWelcome from "@/components/HomeWelcome";
 
 export default function HomePage() {
   return (
     <main className="home-screen">
+      <HomeWelcome />
       <header className="app-bar">
         <BrandLogo tone="dark" />
         <div className="status-dots" aria-hidden="true">

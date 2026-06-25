@@ -5,19 +5,90 @@ import { usePathname, useRouter } from "next/navigation";
 import { speak, startListening, isSpeaking, type Listener } from "@/lib/voice";
 import { requestDescribe, onVoiceToggle, setVoiceListening } from "@/lib/commandBus";
 import { logDebug } from "@/lib/debugLog";
+import { VOICE } from "@/lib/modes";
 
-type NavCommand = { match: (p: string) => boolean; path: string; say: string };
+// "I don't know the modes" / "what are the modes" -> read them all aloud.
+const LIST_MODES_RE =
+  /\b(what (are|is).*mode|which mode|list.*mode|all.*mode|the modes|modes?|choices|options|mga mode|anong mode|ano.*mode|hindi ko alam|hindi alam|wala akong alam|don'?t know|do not know|help me choose|tulungan mo ako|pagpipilian)\b/;
 
-const NAV_COMMANDS: NavCommand[] = [
-  { match: (p) => /\b(outdoor|outside|labas|kalsada|street)\b/.test(p), path: "/outdoor", say: "Outdoor mode" },
-  { match: (p) => /\b(indoor|inside|loob|kwarto|bahay loob)\b/.test(p), path: "/indoor", say: "Indoor mode" },
-  { match: (p) => /\b(social|people|tao|kausap|kaharap)\b/.test(p), path: "/social", say: "Social mode" },
-  { match: (p) => /\b(cooking|kitchen|cook|luto|kusina)\b/.test(p), path: "/cooking", say: "Cooking mode" },
-  { match: (p) => /\b(study|reading|read|basa|aral)\b/.test(p), path: "/study", say: "Study mode" },
-  { match: (p) => /\b(teach|my world|register|ituro)\b/.test(p), path: "/teach", say: "Teach my world" },
-  { match: (p) => /\b(video call|call|volunteer|emergency|help me|panic|tulong|saklolo)\b/.test(p), path: "/emergency", say: "Video call" },
-  { match: (p) => /\b(home|main menu|menu|umuwi|bahay)\b/.test(p), path: "/", say: "Home" },
+type Destination = {
+  path: string;
+  say: string;
+  /** Higher tiers win ties. Modes + Video Call are tier 2; Home/Teach tier 1. */
+  priority: number;
+  /** Intent keywords (English + Filipino/Taglish), matched anywhere in the phrase. */
+  keywords: RegExp;
+};
+
+// Order matters within a tier: earlier entries win ties (modes first).
+const DESTINATIONS: Destination[] = [
+  {
+    path: "/outdoor",
+    say: "Outdoor mode",
+    priority: 2,
+    keywords:
+      /\b(outdoor|outside|out\s?side|going out|go out|walk|walking|jog|jogging|run|running|commut\w*|travel|trip|street|road|sidewalk|labas|lalabas|maglalakad|maglakad|naglalakad|lakad|kalsada|kalye|daan|biyahe|lalakad)\b/,
+  },
+  {
+    path: "/indoor",
+    say: "Indoor mode",
+    priority: 2,
+    keywords:
+      /\b(indoor|inside|in\s?side|room|bedroom|living room|hallway|sa loob|loob|kwarto|kuwarto|silid|sala|pasilyo)\b/,
+  },
+  {
+    path: "/social",
+    say: "Social mode",
+    priority: 2,
+    keywords:
+      /\b(social|socialize|socializing|people|person|someone|friend|friends|talk|talking|chat|conversation|meeting|meet|guest|guests|visitor|tao|mga tao|kausap|kakausap|kausapin|kaibigan|bisita|kaharap|harap)\b/,
+  },
+  {
+    path: "/study",
+    say: "Study mode",
+    priority: 2,
+    keywords:
+      /\b(study|studying|read|reading|book|books|learn|learning|review|reviewing|homework|school|class|basa|magbasa|babasa|nagbabasa|aral|mag-?aral|nag-?aaral|libro|eskwela|paaralan|takdang aralin|leksyon)\b/,
+  },
+  {
+    path: "/cooking",
+    say: "Cooking mode",
+    priority: 2,
+    keywords:
+      /\b(cook|cooking|kitchen|recipe|bake|baking|fry|frying|eat|eating|meal|food|prepare food|luto|magluluto|magluto|nagluluto|niluluto|kakain|kumain|kusina|pagkain|ulam|hapunan|tanghalian|almusal|magtimpla)\b/,
+  },
+  {
+    path: "/emergency",
+    say: "Video call",
+    priority: 2,
+    keywords:
+      /\b(video call|videocall|video|call|caller|volunteer|emergency|help|assist|assistance|tawag|tumawag|tawagan|tumatawag|magpatulong|tulong|saklolo)\b/,
+  },
+  {
+    path: "/",
+    say: "Home",
+    priority: 1,
+    keywords:
+      /\b(home|home screen|main menu|main|menu|go back|back|umuwi|uwi|bumalik|balik|tahanan)\b/,
+  },
+  {
+    path: "/teach",
+    say: "Teach my world",
+    priority: 1,
+    keywords: /\b(teach|teaching|my world|register|remember this|ituro|turuan|tandaan)\b/,
+  },
 ];
+
+/** Pick the best destination for a phrase, prioritizing modes over Home/Teach. */
+function matchDestination(query: string): Destination | null {
+  let best: Destination | null = null;
+  for (const d of DESTINATIONS) {
+    if (d.keywords.test(query) && (!best || d.priority > best.priority)) {
+      best = d;
+    }
+  }
+  return best;
+}
 
 // Trigger word + common mis-hears of "kita" from the Filipino recognizer.
 const TRIGGER_WORD_RE =
@@ -48,12 +119,13 @@ export default function VoiceCommander() {
   const navCooldownRef = useRef(0);
   const queryDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastQueryFireRef = useRef(0);
+  const lastListRef = useRef(0);
 
-  function navigate(cmd: NavCommand) {
-    if (pathRef.current === cmd.path) return;
-    logDebug("nav", cmd.path);
-    speak(cmd.say);
-    router.push(cmd.path);
+  function navigate(dest: Destination) {
+    if (pathRef.current === dest.path) return;
+    logDebug("nav", dest.path);
+    speak(dest.say);
+    router.push(dest.path);
   }
 
   function fireDescribe(query: string) {
@@ -83,16 +155,25 @@ export default function VoiceCommander() {
     if (!trig.hit) return;
     const query = trig.query;
 
-    // Navigation command after the trigger ("Hey Kita, outdoor").
+    // Navigation after the trigger, context-aware ("Hey Kita, I'm going to cook").
     const now = Date.now();
-    for (const cmd of NAV_COMMANDS) {
-      if (cmd.match(query)) {
-        if (now - navCooldownRef.current < 3000) return;
-        navCooldownRef.current = now;
-        if (queryDebounceRef.current) clearTimeout(queryDebounceRef.current);
-        navigate(cmd);
-        return;
-      }
+    const dest = matchDestination(query);
+    if (dest) {
+      if (now - navCooldownRef.current < 3000) return;
+      navCooldownRef.current = now;
+      if (queryDebounceRef.current) clearTimeout(queryDebounceRef.current);
+      navigate(dest);
+      return;
+    }
+
+    // "What are the modes?" / "I don't know" -> read all modes aloud.
+    if (LIST_MODES_RE.test(query)) {
+      if (now - lastListRef.current < 4000) return;
+      lastListRef.current = now;
+      if (queryDebounceRef.current) clearTimeout(queryDebounceRef.current);
+      logDebug("trigger", "list modes");
+      void speak(VOICE.modesList());
+      return;
     }
 
     // Otherwise it's an open question / describe shortcut. Debounce so we

@@ -17,6 +17,8 @@ export interface ModeDefinition {
   color: string;
   /** Glyph shown on the home card and the in-view mode pill. */
   icon: IconName;
+  /** Short Filipino purpose spoken when listing the modes aloud. */
+  voicePurpose: string;
 }
 
 export const MODES: Record<ModeId, ModeDefinition> = {
@@ -33,6 +35,7 @@ export const MODES: Record<ModeId, ModeDefinition> = {
     targetFps: 20,
     color: "#ffe374",
     icon: "sun",
+    voicePurpose: "para sa paglalakad o pagbiyahe sa labas",
   },
   indoor: {
     id: "indoor",
@@ -47,6 +50,7 @@ export const MODES: Record<ModeId, ModeDefinition> = {
     targetFps: 12,
     color: "#ffb27a",
     icon: "house",
+    voicePurpose: "para sa loob ng bahay at paghahanap ng gamit",
   },
   social: {
     id: "social",
@@ -61,6 +65,7 @@ export const MODES: Record<ModeId, ModeDefinition> = {
     targetFps: 8,
     color: "#c9e57c",
     icon: "users",
+    voicePurpose: "para sa mga tao at usapan sa paligid",
   },
   study: {
     id: "study",
@@ -75,6 +80,7 @@ export const MODES: Record<ModeId, ModeDefinition> = {
     targetFps: 1,
     color: "#87e1dd",
     icon: "book",
+    voicePurpose: "para sa pagbabasa at teksto",
   },
   cooking: {
     id: "cooking",
@@ -89,6 +95,7 @@ export const MODES: Record<ModeId, ModeDefinition> = {
     targetFps: 8,
     color: "#b7bdff",
     icon: "cutlery",
+    voicePurpose: "para sa kusina at pagluluto",
   },
 };
 
@@ -103,3 +110,19 @@ export const MODE_LIST: ModeDefinition[] = [
 export function getMode(id: ModeId): ModeDefinition {
   return MODES[id];
 }
+
+/** Spoken copy for the boot welcome + "what are the modes" announcement. */
+export const VOICE = {
+  welcome:
+    "Maligayang pagdating sa KitaKita. Anong mode ang gusto mong gamitin? " +
+    "Kung hindi mo alam ang mga mode, sabihin: Hey Kita, anong mga mode.",
+  modesList(): string {
+    const items = MODE_LIST.map((m) => `${m.label}, ${m.voicePurpose}`);
+    return (
+      "Ito ang mga mode. " +
+      items.join(". ") +
+      ". At Video Call, para tumawag ng volunteer o tulong. " +
+      "Pumili ng isa. Sabihin: Hey Kita, at ang pangalan ng mode."
+    );
+  },
+};
