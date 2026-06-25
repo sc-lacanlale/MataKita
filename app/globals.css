@@ -265,9 +265,10 @@ button {
 }
 .nav-label {
   font-family: var(--brand-font);
-  font-size: 18px;
+  font-size: 15px;
   font-weight: 400;
   letter-spacing: -0.4px;
+  white-space: nowrap;
 }
 
 /* ---------- View / camera screen ---------- */

@@ -20,6 +20,24 @@ export function requestDescribe(payload?: string): boolean {
   return true;
 }
 
+/* ---------- Enroll a person ("this is my mom") ---------- */
+
+type LabelHandler = (label: string) => void;
+
+const enrollHandlers = new Set<LabelHandler>();
+
+export function onEnrollRequested(handler: LabelHandler): () => void {
+  enrollHandlers.add(handler);
+  return () => enrollHandlers.delete(handler);
+}
+
+/** Returns false if no camera screen is mounted to capture a face. */
+export function requestEnroll(label: string): boolean {
+  if (enrollHandlers.size === 0) return false;
+  enrollHandlers.forEach((h) => h(label));
+  return true;
+}
+
 /* ---------- Global voice listening toggle + state ---------- */
 
 type VoidHandler = () => void;

@@ -10,10 +10,16 @@ import { startSession, type GeminiSession } from "@/lib/services/geminiService";
 import { speak } from "@/lib/voice";
 import {
   onDescribeRequested,
+  onEnrollRequested,
   onVoiceListening,
   requestVoiceToggle,
 } from "@/lib/commandBus";
 import { setLastMode } from "@/lib/lastMode";
+import {
+  loadFaceModels,
+  enrollFromStream,
+  identifyFromStream,
+} from "@/lib/services/faceService";
 
 interface ModeShellProps {
   mode: ModeDefinition;
@@ -29,6 +35,7 @@ export default function ModeShell({ mode }: ModeShellProps) {
   const [facing, setFacing] = useState<Facing>("environment");
   const sessionRef = useRef<GeminiSession | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const recognizedRef = useRef<string | null>(null);
 
   function startAssistant() {
     sessionRef.current?.stop();
@@ -43,13 +50,16 @@ export default function ModeShell({ mode }: ModeShellProps) {
       },
       onMessage: (text) => {
         setBusy(false);
-        setMessage(text);
-        speak(text);
+        const name = recognizedRef.current;
+        recognizedRef.current = null;
+        const full = name ? `Si ${name} ang nasa harap mo. ${text}` : text;
+        setMessage(full);
+        speak(full);
       },
     });
   }
 
-  function describe(query?: string) {
+  async function describe(query?: string) {
     if (!sessionRef.current) {
       startAssistant();
       setMessage("Sandali, naghahanda pa...");
@@ -57,7 +67,30 @@ export default function ModeShell({ mode }: ModeShellProps) {
     }
     setBusy(true);
     setMessage(query ? `Tinitingnan: ${query}` : "Sandali, tinitingnan...");
+    // Local, on-device face check before the cloud description so we can say
+    // "Si Nanay ang nasa harap mo" when a saved person is recognized.
+    recognizedRef.current = await identifyFromStream(streamRef.current);
     sessionRef.current.describe(query);
+  }
+
+  async function enroll(label: string) {
+    setBusy(true);
+    setMessage(`Tinitingnan si ${label}...`);
+    const result = await enrollFromStream(streamRef.current, label);
+    setBusy(false);
+    if (result === "ok") {
+      const msg = `Naitala ko si ${label}. Sasabihin ko kapag nakita ko ulit.`;
+      setMessage(msg);
+      speak(msg);
+    } else if (result === "no-face") {
+      const msg = "Walang nakitang mukha. Itutok ang camera sa tao at subukan ulit.";
+      setMessage(msg);
+      speak(msg);
+    } else {
+      const msg = "Hindi pa handa ang face recognition. Subukan ulit mamaya.";
+      setMessage(msg);
+      speak(msg);
+    }
   }
 
   async function toggleTorch() {
@@ -83,10 +116,13 @@ export default function ModeShell({ mode }: ModeShellProps) {
   useEffect(() => {
     setLastMode(mode.id);
     startAssistant();
-    const offDescribe = onDescribeRequested((payload) => describe(payload));
+    void loadFaceModels();
+    const offDescribe = onDescribeRequested((payload) => void describe(payload));
+    const offEnroll = onEnrollRequested((label) => void enroll(label));
     const offMic = onVoiceListening(setMicOn);
     return () => {
       offDescribe();
+      offEnroll();
       offMic();
       sessionRef.current?.stop();
     };

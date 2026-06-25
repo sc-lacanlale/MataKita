@@ -3,7 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { speak, startListening, isSpeaking, type Listener } from "@/lib/voice";
-import { requestDescribe, onVoiceToggle, setVoiceListening } from "@/lib/commandBus";
+import {
+  requestDescribe,
+  requestEnroll,
+  onVoiceToggle,
+  setVoiceListening,
+} from "@/lib/commandBus";
 import { logDebug } from "@/lib/debugLog";
 import { VOICE } from "@/lib/modes";
 
@@ -96,6 +101,34 @@ const TRIGGER_WORD_RE =
 // Quick-describe shortcut words after the trigger.
 const LOOK_RE = /^(look|see|tingin|tignan|tingnan|titignan|tumingin|silip|tingnan mo)\b/;
 
+// Strip leading filler words from a captured name ("my mom" -> "mom").
+const ENROLL_STOPWORDS = /^(my|a|an|the|named|si|ang|yung|isang)\s+/;
+
+function cleanName(raw: string): string {
+  let s = raw.replace(/[.?!,;:]+$/, "").trim();
+  s = s.split(/\s+/).slice(0, 4).join(" ");
+  for (let i = 0; i < 3; i++) {
+    const n = s.replace(ENROLL_STOPWORDS, "");
+    if (n === s) break;
+    s = n;
+  }
+  s = s.trim();
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : "";
+}
+
+// "this is my mom" / "ito si nanay" / "remember this as bob" -> "Mom" / "Nanay" / "Bob".
+function parseEnroll(q: string): string | null {
+  const m =
+    q.match(/\bthis (?:is|person is)\s+(.+)/) ||
+    q.match(/\b(?:remember|save)\s+(?:this\s+(?:as|is)\s+)?(.+)/) ||
+    q.match(/\bito\s+(?:ay\s+)?si\s+(.+)/) ||
+    q.match(/\bsi\s+(.+?)\s+(?:ito|iyan|yan)\b/) ||
+    q.match(/\b(?:siya|kilala ko|tandaan(?:\s+mo)?)\s+si\s+(.+)/);
+  if (!m) return null;
+  const name = cleanName(m[1]);
+  return name || null;
+}
+
 function parseTrigger(phrase: string): { hit: boolean; query: string } {
   const m = phrase.match(TRIGGER_WORD_RE);
   if (!m || m.index == null) return { hit: false, query: "" };
@@ -120,6 +153,7 @@ export default function VoiceCommander() {
   const queryDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastQueryFireRef = useRef(0);
   const lastListRef = useRef(0);
+  const lastEnrollRef = useRef(0);
 
   function navigate(dest: Destination) {
     if (pathRef.current === dest.path) return;
@@ -154,6 +188,18 @@ export default function VoiceCommander() {
     const trig = parseTrigger(phrase);
     if (!trig.hit) return;
     const query = trig.query;
+
+    // Enroll a person ("Hey Kita, this is my mom" / "ito si Nanay").
+    const enrollName = parseEnroll(query);
+    if (enrollName) {
+      const t = Date.now();
+      if (t - lastEnrollRef.current < 3500) return;
+      lastEnrollRef.current = t;
+      if (queryDebounceRef.current) clearTimeout(queryDebounceRef.current);
+      logDebug("trigger", `enroll -> ${enrollName}`);
+      if (!requestEnroll(enrollName)) speak("Pumunta muna sa isang mode na may camera.");
+      return;
+    }
 
     // Navigation after the trigger, context-aware ("Hey Kita, I'm going to cook").
     const now = Date.now();
