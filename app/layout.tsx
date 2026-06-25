@@ -30,7 +30,7 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
-          href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Tilt+Warp&display=swap"
+          href="https://fonts.googleapis.com/css2?family=ABeeZee:ital@0;1&family=Baloo+2:wght@500;700;800&family=Tilt+Warp&display=swap"
           rel="stylesheet"
         />
       </head>

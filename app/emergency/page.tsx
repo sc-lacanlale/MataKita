@@ -105,8 +105,14 @@ export default function VideoCallScreen() {
 
       {active && (
         <div className="call-controls">
-          <button type="button" className="call-round" aria-label="Camera" onClick={() => {}}>
-            <Icon name="camera" size={30} />
+          <button
+            type="button"
+            className="call-round"
+            aria-pressed={muted}
+            aria-label={muted ? "I-unmute" : "I-mute"}
+            onClick={() => setMuted((m) => !m)}
+          >
+            <Icon name={muted ? "micOff" : "mic"} size={30} />
           </button>
           <button
             type="button"
@@ -116,14 +122,8 @@ export default function VideoCallScreen() {
           >
             <Icon name="phone" size={30} style={{ transform: "rotate(135deg)" }} />
           </button>
-          <button
-            type="button"
-            className="call-round"
-            aria-pressed={muted}
-            aria-label={muted ? "I-unmute" : "I-mute"}
-            onClick={() => setMuted((m) => !m)}
-          >
-            <Icon name={muted ? "micOff" : "mic"} size={30} />
+          <button type="button" className="call-round" aria-label="Flip Camera" onClick={() => {}}>
+            <Icon name="flipCamera" size={30} />
           </button>
         </div>
       )}

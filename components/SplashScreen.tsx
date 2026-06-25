@@ -39,6 +39,7 @@ export default function SplashScreen() {
       </div>
 
       <div className="splash-bubble-dark" aria-hidden="true">
+        <div className="splash-bubble-dark-head" />
         <span className="splash-eyes">
           <i />
           <i />
@@ -46,6 +47,7 @@ export default function SplashScreen() {
       </div>
 
       <div className="splash-bubble-light" aria-hidden="true">
+        <div className="splash-bubble-light-head" />
         <div className="splash-logo">
           <span>Kita</span>
           <span>Kita</span>

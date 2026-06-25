@@ -33,7 +33,7 @@ export const MODES: Record<ModeId, ModeDefinition> = {
       "Reading signage (bus stops, street names)",
     ],
     targetFps: 20,
-    color: "#ffe374",
+    color: "#FFE374",
     icon: "sun",
     voicePurpose: "para sa paglalakad o pagbiyahe sa labas",
   },
