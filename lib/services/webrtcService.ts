@@ -45,7 +45,7 @@ export function startHandoff(options: StartHandoffOptions): HandoffSession {
       setTimeout(() => {
         onStep?.({ label, done: true });
         if (i === steps.length - 1) onConnected?.();
-      }, 500 * (i + 1))
+      }, 900 * (i + 1))
     );
   });
 
